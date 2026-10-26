@@ -1,0 +1,52 @@
+{
+ "Date": "2026-10-24T11:30:00+03:00",
+ "PreviousDate": "2026-10-23T11:30:00+03:00",
+ "Timestamp": "2026-10-26T11:00:00+03:00",
+ "Valute": {
+  "USD": {
+   "ID": "R01235",
+   "NumCode": "840",
+   "CharCode": "USD",
+   "Nominal": 1,
+   "Name": "Доллар США",
+   "Value": 80.5381,
+   "Previous": 81.1255
+  },
+  "EUR": {
+   "ID": "R01239",
+   "NumCode": "978",
+   "CharCode": "EUR",
+   "Nominal": 1,
+   "Name": "Евро",
+   "Value": 90.2429,
+   "Previous": 91.1364
+  },
+  "KZT": {
+   "ID": "R01335",
+   "NumCode": "398",
+   "CharCode": "KZT",
+   "Nominal": 100,
+   "Name": "Тенге",
+   "Value": 17.9797,
+   "Previous": 18.0837
+  },
+  "VND": {
+   "ID": "R01150",
+   "NumCode": "704",
+   "CharCode": "VND",
+   "Nominal": 10000,
+   "Name": "Донгов",
+   "Value": 31.427,
+   "Previous": 31.6501
+  },
+  "JPY": {
+   "ID": "R01820",
+   "NumCode": "392",
+   "CharCode": "JPY",
+   "Nominal": 100,
+   "Name": "Иен",
+   "Value": 51.4785,
+   "Previous": 51.2771
+  }
+ }
+}

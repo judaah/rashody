@@ -1,0 +1,9 @@
+node_modules
+dist
+dev-dist
+*.local
+.DS_Store
+# Настоящие выписки и бэкапы — личные данные, в репозиторий не попадают
+samples/
+*.backup.json
+rashody-backup-*.json
