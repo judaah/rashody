@@ -1,7 +1,8 @@
 import { useState } from 'preact/hooks';
 import type { Category, Expense } from '../db/db';
 import { db } from '../db/db';
-import { allBudgets, expensesOfMonth, getSetting, recentExpenses, SETTING_LAST_BACKUP } from '../db/repo';
+import { allBudgets, getSetting, SETTING_LAST_BACKUP } from '../db/repo';
+import { scopedFirstDate, scopedMonth, scopedRecent, type OwnedExpense, type Scope } from '../db/scope';
 import { formatMoney } from '../lib/money';
 import { daysBetween, formatMonth, monthOf, monthRange } from '../lib/dates';
 import { useLive, useToday } from '../lib/hooks';
@@ -12,6 +13,7 @@ import { BudgetMeter, budgetCaption } from './Budgets';
 import { recordTemplate, suggestionAsTemplate, TemplateForm, useQuickEntries } from './Templates';
 import { saveBackupFile } from './files';
 import { IconQr } from './icons';
+import { useMoney } from './displayMoney';
 
 const RECENT_LIMIT = 15;
 
@@ -22,30 +24,38 @@ export function Home({
   onOpenCategory,
   onShowHistory,
   onScanReceipt,
+  scope,
+  partnerName,
+  partnerMark,
 }: {
   categories: Map<string, Category>;
   categoryList: Category[];
-  onOpen: (e: Expense) => void;
+  onOpen: (e: Expense | OwnedExpense) => void;
   onOpenCategory: (categoryId: string) => void;
   onShowHistory: () => void;
   onScanReceipt: () => void;
+  scope: Scope;
+  partnerName: string;
+  partnerMark: string;
 }) {
+  const money = useMoney();
   const today = useToday();
   const ym = monthOf(today);
   const [templateForm, setTemplateForm] = useState(false);
-  const month = useLive(() => expensesOfMonth(ym), [ym]);
-  const recent = useLive(() => recentExpenses(RECENT_LIMIT), []);
+  const month = useLive(() => scopedMonth(ym, scope), [ym, scope]);
+  const recent = useLive(() => scopedRecent(RECENT_LIMIT, scope), [scope]);
+  // Шаблоны, бюджет и быстрая запись — про мои траты, в других режимах их не показываем.
+  const mine = scope === 'me';
   const quick = useQuickEntries(categories);
   const meta = useLive(async () => {
     const firstCreated = await db.expenses.orderBy('createdAt').first();
-    const firstDated = await db.expenses.orderBy('date').first();
     const lastBackup = await getSetting<number | null>(SETTING_LAST_BACKUP, null);
     return {
       backupDue: needsBackupReminder(lastBackup, firstCreated?.createdAt ?? null),
-      firstDate: firstDated?.date ?? null,
-      budgets: await allBudgets(),
+      firstDate: await scopedFirstDate(scope),
+      budgets: mine ? await allBudgets() : [],
     };
-  }, []);
+  }, [scope]);
 
   if (!month || !recent || !meta) return null;
 
@@ -71,21 +81,24 @@ export function Home({
   return (
     <div class="screen-body">
       <header class="hero">
-        <div class="hero-month">{formatMonth(ym)}</div>
+        <div class="hero-month">
+          {formatMonth(ym)}
+          {scope === 'partner' ? ` · ${partnerName}` : scope === 'together' ? ' · вместе' : ''}
+        </div>
         <div class="hero-total" data-testid="month-total">
-          {formatMoney(total)}
+          {money.fmt(total)}
         </div>
         <div class="hero-sub">
-          Сегодня <b>{formatMoney(todayTotal)}</b>
+          Сегодня <b>{money.fmt(todayTotal)}</b>
           {total > 0 && perDay !== null && (
             <>
-              {' · '}в среднем <b>{formatMoney(perDay)}</b> в день
+              {' · '}в среднем <b>{money.fmt(perDay)}</b> в день
             </>
           )}
         </div>
       </header>
 
-      {quick && (
+      {quick && mine && (
         <div class="chips-scroll quick-row" aria-label="Быстрая запись">
           <button class="chip quick-chip chip-scan" onClick={onScanReceipt}>
             <IconQr size={16} /> Чек
@@ -121,12 +134,12 @@ export function Home({
         <div class="card budget-card">
           <div class="budget-line">
             <span>{budget.left >= 0 ? 'Осталось по бюджету' : 'Перерасход бюджета'}</span>
-            <b class={budget.left < 0 ? 'danger' : ''}>{formatMoney(Math.abs(budget.left))}</b>
+            <b class={budget.left < 0 ? 'danger' : ''}>{money.fmt(Math.abs(budget.left))}</b>
           </div>
           <BudgetMeter state={budget} />
           <div class="row-sub">
-            Потрачено {formatMoney(budget.spent)} из {formatMoney(budget.limit)}
-            {budget.left > 0 && <> · ≈ {formatMoney(dailyAllowance(budget.left, today))} в день до конца месяца</>}
+            Потрачено {money.fmt(budget.spent)} из {money.fmt(budget.limit)}
+            {budget.left > 0 && <> · ≈ {money.fmt(dailyAllowance(budget.left, today))} в день до конца месяца</>}
           </div>
         </div>
       )}
@@ -143,7 +156,14 @@ export function Home({
       )}
 
       {recent.length === 0 && ranking.length === 0 ? (
-        <EmptyState title="Пока пусто" text="Нажми «+», введи сумму и выбери категорию — первая трата сохранится." />
+        <EmptyState
+          title="Пока пусто"
+          text={
+            scope === 'partner'
+              ? `${partnerName}: трат пока нет. Они появятся здесь, когда партнёр их запишет.`
+              : 'Нажми «+», введи сумму и выбери категорию — первая трата сохранится.'
+          }
+        />
       ) : (
         <>
           {ranking.length > 0 && (
@@ -164,7 +184,7 @@ export function Home({
                         {state ? (
                           <>
                             <BudgetMeter state={state} />
-                            <span class="row-sub">{budgetCaption(state, false)}</span>
+                            <span class="row-sub">{budgetCaption(state, money.fmt, false)}</span>
                           </>
                         ) : (
                           <span class="bar">
@@ -172,7 +192,7 @@ export function Home({
                           </span>
                         )}
                       </span>
-                      <span class="row-amount num">{formatMoney(sum)}</span>
+                      <span class="row-amount num">{money.fmt(sum)}</span>
                     </button>
                   );
                 })}
@@ -180,7 +200,13 @@ export function Home({
             </section>
           )}
 
-          <DayGroups expenses={recent} categories={categories} today={today} onOpen={onOpen} />
+          <DayGroups
+            expenses={recent}
+            categories={categories}
+            today={today}
+            onOpen={onOpen}
+            partnerMark={scope === 'together' ? partnerMark : undefined}
+          />
           {recent.length > 0 && (
             <button class="btn btn-plain" onClick={onShowHistory}>
               Вся история

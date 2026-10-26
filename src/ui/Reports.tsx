@@ -1,8 +1,7 @@
 import { useState } from 'preact/hooks';
 import type { Category } from '../db/db';
-import { expensesBetween } from '../db/repo';
+import { scopedBetween, type Scope } from '../db/scope';
 import { OTHER_COLOR } from '../db/seed';
-import { formatMoney, formatMoneyCompact } from '../lib/money';
 import { formatMonth, monthGenitive, monthOf, monthPrepositional, monthRange, monthShort, shiftMonth } from '../lib/dates';
 import {
   comparePeriods,
@@ -18,6 +17,7 @@ import {
 } from '../lib/stats';
 import { useLive, useToday } from '../lib/hooks';
 import { EmptyState } from './common';
+import { useMoney } from './displayMoney';
 import { IconBack, IconChevron } from './icons';
 
 type Span = 6 | 12;
@@ -25,10 +25,13 @@ type Span = 6 | 12;
 export function Reports({
   categories,
   onOpenCategory,
+  scope,
 }: {
   categories: Map<string, Category>;
   onOpenCategory: (categoryId: string, ym: string) => void;
+  scope: Scope;
 }) {
+  const money = useMoney();
   const today = useToday();
   const currentYm = monthOf(today);
   const [ym, setYm] = useState(currentYm);
@@ -50,7 +53,7 @@ export function Reports({
   };
 
   const from = [months[0], shiftMonth(ym, -1)].sort()[0];
-  const data = useLive(() => expensesBetween(monthRange(from)[0], monthRange(windowEnd)[1]), [from, windowEnd]);
+  const data = useLive(() => scopedBetween(monthRange(from)[0], monthRange(windowEnd)[1], scope), [from, windowEnd, scope]);
   if (!data) return null;
 
   const cmp = comparePeriods(ym, today);
@@ -95,7 +98,7 @@ export function Reports({
           </button>
         </div>
         <div class="month-total" data-testid="report-total">
-          {formatMoney(total)}
+          {money.fmt(total)}
         </div>
         <div class="compare" data-testid="report-compare">
           {previousTotal === 0 ? (
@@ -103,9 +106,9 @@ export function Reports({
           ) : change === 0 ? (
             <span>Столько же, сколько {prevLabel}</span>
           ) : (
-            <span class={change! > 0 ? 'danger' : 'accent'}>
+            <span class={change! > 0 ? 'danger' : 'good'}>
               {change! > 0 ? '▲' : '▼'} на {Math.abs(change!)}% {change! > 0 ? 'больше' : 'меньше'}, чем {prevLabel}
-              <span class="muted"> ({formatMoney(previousTotal)})</span>
+              <span class="muted"> ({money.fmt(previousTotal)})</span>
             </span>
           )}
         </div>
@@ -135,7 +138,7 @@ export function Reports({
                 ))}
               </svg>
               <div class="donut-center">
-                <div class="donut-value">{formatMoneyCompact(positiveTotal)}</div>
+                <div class="donut-value">{money.fmtCompact(positiveTotal)}</div>
                 <div class="muted">за месяц</div>
               </div>
             </div>
@@ -163,7 +166,7 @@ export function Reports({
                       )}
                     </span>
                   </span>
-                  <span class="row-amount num">{formatMoney(sum)}</span>
+                  <span class="row-amount num">{money.fmt(sum)}</span>
                 </button>
               );
             })}
@@ -190,17 +193,17 @@ export function Reports({
                 class={`col ${m === ym ? 'is-on' : ''}`}
                 onClick={() => setYm(m)}
                 aria-pressed={m === ym}
-                aria-label={`${formatMonth(m)}: ${formatMoney(values[i])}`}
+                aria-label={`${formatMonth(m)}: ${money.fmt(values[i])}`}
               >
                 <span class="col-plot">
-                  {m === ym && <span class="col-value">{formatMoneyCompact(values[i])}</span>}
+                  {m === ym && <span class="col-value">{money.fmtCompact(values[i])}</span>}
                   <span class="col-bar" style={{ height: `${(values[i] / maxValue) * 100}%` }} />
                 </span>
                 <span class="col-label">{monthShort(m)}</span>
               </button>
             ))}
           </div>
-          {average !== null && <div class="row-sub columns-note">В среднем {formatMoney(average)} в месяц</div>}
+          {average !== null && <div class="row-sub columns-note">В среднем {money.fmt(average)} в месяц</div>}
         </div>
         <details class="table-view">
           <summary>Показать таблицей</summary>
@@ -208,7 +211,7 @@ export function Reports({
             {[...months].reverse().map((m) => (
               <div class="row" key={m}>
                 <span class="row-main row-title">{formatMonth(m, currentYm)}</span>
-                <span class="row-amount num">{formatMoney(Math.max(0, totals.get(m) ?? 0))}</span>
+                <span class="row-amount num">{money.fmt(Math.max(0, totals.get(m) ?? 0))}</span>
               </div>
             ))}
           </div>

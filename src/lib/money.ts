@@ -105,9 +105,13 @@ export function plural(n: number, one: string, few: string, many: string): strin
 const compactFmt =new Intl.NumberFormat('ru-RU', { notation: 'compact', maximumFractionDigits: 1 });
 
 /** Короткая подпись для графиков: 4530000 → «45,3 тыс. ₽», мелкие суммы — как есть, без копеек. */
-export function formatMoneyCompact(minor: number): string {
-  const rub = Math.round(minor / 100);
-  return Math.abs(rub) < 10_000 ? formatMoney(rub * 100) : `${compactFmt.format(rub)} ₽`;
+export function formatMoneyCompact(minor: number, currency: string = RUB): string {
+  const whole = Math.round(minor / 100);
+  if (Math.abs(whole) < 10_000) return formatMoney(whole * 100, currency);
+  const symbol = new Intl.NumberFormat('ru-RU', { style: 'currency', currency, currencyDisplay: 'narrowSymbol' })
+    .formatToParts(0)
+    .find((p) => p.type === 'currency')?.value;
+  return `${compactFmt.format(whole)} ${symbol ?? currency}`;
 }
 
 const formatters = new Map<string, Intl.NumberFormat>();

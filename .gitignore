@@ -7,3 +7,6 @@ dev-dist
 samples/
 *.backup.json
 rashody-backup-*.json
+
+# Сборка функции посредника (tools/yc-deploy.sh собирает заново)
+sync-server/dist/

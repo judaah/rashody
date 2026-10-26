@@ -16,5 +16,5 @@
     "noEmit": true,
     "types": ["vite/client", "vite-plugin-pwa/preact", "node"]
   },
-  "include": ["src", "tests", "vite.config.ts"]
+  "include": ["src", "tests", "sync-server", "vite.config.ts"]
 }

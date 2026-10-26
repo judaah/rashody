@@ -63,11 +63,42 @@ export async function resolveRate(
   return local ? { rate: local.rate, source: 'stale', date: local.date } : null;
 }
 
-/** Загрузить свежие курсы (кнопка в настройках). Возвращает дату курса ЦБ. */
-export async function refreshRates(fetchImpl?: FetchLike): Promise<string | null> {
-  const date = today();
+export const SETTING_RATES_REFRESHED = 'ratesRefreshedAt';
+/** Курсы ЦБ меняются раз в день — проверять чаще раза в 6 часов незачем. */
+export const RATES_REFRESH_MS = 6 * 60 * 60 * 1000;
+
+/** Загрузить свежие курсы. Возвращает дату курса ЦБ и запоминает, когда обновляли. */
+export async function refreshRates(fetchImpl?: FetchLike, now: number = Date.now()): Promise<string | null> {
+  const date = today(new Date(now));
   requested.delete(date);
-  return (await loadFromCbr(date, fetchImpl))?.date ?? null;
+  const parsed = await loadFromCbr(date, fetchImpl);
+  if (parsed) await db.settings.put({ key: SETTING_RATES_REFRESHED, value: now });
+  return parsed?.date ?? null;
+}
+
+export type AutoRefreshResult = 'fresh' | 'updated' | 'offline' | 'failed';
+
+/** Обновить курсы сами, если прошлое обновление было больше 6 часов назад. Ошибок не бросает. */
+export async function autoRefreshRates({
+  now = Date.now(),
+  online = navigator.onLine,
+  fetchImpl,
+}: { now?: number; online?: boolean; fetchImpl?: FetchLike } = {}): Promise<AutoRefreshResult> {
+  const last = (await db.settings.get(SETTING_RATES_REFRESHED))?.value as number | undefined;
+  if (last && now - last < RATES_REFRESH_MS) return 'fresh';
+  if (!online) return 'offline';
+  try {
+    return (await refreshRates(fetchImpl, now)) ? 'updated' : 'failed';
+  } catch {
+    return 'failed';
+  }
+}
+
+/** Последний сохранённый курс валюты: на сегодня или раньше, иначе любой. */
+export async function latestRate(currency: string): Promise<{ rate: number; date: string } | null> {
+  if (currency === RUB) return { rate: 1, date: today() };
+  const found = (await localRate(currency, today())) ?? (await db.rates.where('currency').equals(currency).last());
+  return found ? { rate: found.rate, date: found.date } : null;
 }
 
 export async function latestRateDate(): Promise<string | null> {

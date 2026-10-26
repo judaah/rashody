@@ -79,6 +79,7 @@ export interface Setting {
   value: unknown;
 }
 
+/** Мои таблицы — они попадают в бэкап. Траты партнёра хранятся отдельно и в бэкап не идут. */
 export const TABLE_NAMES = [
   'categories',
   'expenses',
@@ -91,6 +92,18 @@ export const TABLE_NAMES = [
 ] as const;
 export type TableName = (typeof TABLE_NAMES)[number];
 
+/** Траты партнёра: последний расшифрованный снимок с его телефона, только для просмотра. */
+export const PARTNER_TABLES = ['partnerExpenses', 'partnerCategories'] as const;
+
+/**
+ * Настройки этого телефона, которые не уходят в бэкап: ключ пары (файл бэкапа лежит в iCloud,
+ * ключу там не место) и служебные отметки обмена. При восстановлении из бэкапа они сохраняются.
+ */
+export const SETTING_PAIRING = 'pairing';
+export const SETTING_PARTNER = 'partner';
+export const SETTING_PUSH_HASH = 'syncPushHash';
+export const DEVICE_ONLY_SETTINGS: readonly string[] = [SETTING_PAIRING, SETTING_PARTNER, SETTING_PUSH_HASH];
+
 export class RashodyDB extends Dexie {
   categories!: EntityTable<Category, 'id'>;
   expenses!: EntityTable<Expense, 'id'>;
@@ -100,6 +113,8 @@ export class RashodyDB extends Dexie {
   importProfiles!: EntityTable<ImportProfile, 'id'>;
   rates!: Dexie.Table<Rate, [string, string]>;
   settings!: EntityTable<Setting, 'key'>;
+  partnerExpenses!: EntityTable<Expense, 'id'>;
+  partnerCategories!: EntityTable<Category, 'id'>;
 
   constructor(name = 'rashody') {
     super(name);
@@ -114,6 +129,11 @@ export class RashodyDB extends Dexie {
       importProfiles: 'id, signature',
       rates: '[date+currency], currency',
       settings: 'key',
+    });
+    // Этап 7: траты партнёра. Только новые таблицы — старые данные не трогаются.
+    this.version(2).stores({
+      partnerExpenses: 'id, date, categoryId, createdAt',
+      partnerCategories: 'id',
     });
     this.on('populate', (tx) => {
       tx.table('categories').bulkAdd(DEFAULT_CATEGORIES);

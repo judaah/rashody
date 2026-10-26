@@ -1,13 +1,19 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { db, type Category } from '../db/db';
-import { getSetting, SETTING_LAST_BACKUP } from '../db/repo';
-import { latestRateDate, recalcStaleExpenses, refreshRates } from '../db/rates';
+import { getSetting, setSetting, SETTING_LAST_BACKUP } from '../db/repo';
+import { latestRate, latestRateDate, recalcStaleExpenses, refreshRates, SETTING_RATES_REFRESHED } from '../db/rates';
+import { RUB } from '../lib/money';
+import { formatRate } from '../lib/rates';
+import { CurrencyPicker } from './CurrencyPicker';
+import { SETTING_DISPLAY_CURRENCY } from './displayMoney';
 import { parseBackup, restoreBackup } from '../lib/backup';
 import { formatShortDate, toISODate } from '../lib/dates';
 import { useLive } from '../lib/hooks';
 import { Budgets } from './Budgets';
 import { Categories } from './Categories';
 import { Import } from './Import';
+import { Partner } from './Partner';
+import { getPartner } from '../db/sync';
 import { Templates } from './Templates';
 import { saveBackupFile, saveCsvFile } from './files';
 import { showToast } from './toast';
@@ -25,6 +31,13 @@ function useStorageInfo() {
   return info;
 }
 
+/** «сегодня в 15:30» или «24 октября». */
+function refreshedText(ts: number): string {
+  const d = new Date(ts);
+  if (toISODate(d) === toISODate(new Date())) return `сегодня в ${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+  return formatShortDate(toISODate(d));
+}
+
 const formatBytes = (b: number) =>
   b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} КБ` : `${(b / 1024 / 1024).toFixed(1).replace('.', ',')} МБ`;
 
@@ -37,14 +50,24 @@ export function Settings({
   categories: Map<string, Category>;
   onShowHistory: () => void;
 }) {
-  const [screen, setScreen] = useState<'main' | 'categories' | 'templates' | 'budgets' | 'import'>('main');
+  const [screen, setScreen] = useState<'main' | 'categories' | 'templates' | 'budgets' | 'import' | 'partner'>('main');
+  const partner = useLive(() => getPartner(), []);
   const lastBackup = useLive(() => getSetting<number | null>(SETTING_LAST_BACKUP, null), []);
   const counts = useLive(
     async () => ({ expenses: await db.expenses.count(), templates: await db.templates.count(), budgets: await db.budgets.count() }),
     [],
   );
   const count = counts?.expenses;
-  const rateDate = useLive(() => latestRateDate(), []);
+  const displayCode = useLive(() => getSetting<string>(SETTING_DISPLAY_CURRENCY, RUB), []) ?? RUB;
+  const rates = useLive(
+    async () => ({
+      date: await latestRateDate(),
+      refreshedAt: await getSetting<number | null>(SETTING_RATES_REFRESHED, null),
+      displayRate: displayCode === RUB ? null : await latestRate(displayCode),
+    }),
+    [displayCode],
+  );
+  const [currencyPicker, setCurrencyPicker] = useState(false);
   const [ratesBusy, setRatesBusy] = useState(false);
   const storage = useStorageInfo();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -53,6 +76,7 @@ export function Settings({
   if (screen === 'categories') return <Categories categories={categoryList} onBack={back} />;
   if (screen === 'templates') return <Templates categories={categories} categoryList={categoryList} onBack={back} />;
   if (screen === 'budgets') return <Budgets categories={categories} categoryList={categoryList} onBack={back} />;
+  if (screen === 'partner') return <Partner onBack={back} />;
   if (screen === 'import') return <Import categoryList={categoryList} onBack={back} onShowHistory={onShowHistory} />;
 
   const run = (fn: () => Promise<void>) => () =>
@@ -75,6 +99,18 @@ export function Settings({
     await restoreBackup(backup);
     showToast(`Восстановлено трат: ${backup.tables.expenses.length}`);
   });
+
+  const pickDisplay = async (code: string) => {
+    await setSetting(SETTING_DISPLAY_CURRENCY, code);
+    if (code === RUB || (await latestRate(code))) return;
+    // курса этой валюты ещё не было — пробуем загрузить сразу
+    try {
+      await refreshRates();
+    } catch {
+      // нет сети — ниже скажем
+    }
+    if (!(await latestRate(code))) showToast(`Курса ${code} пока нет — итоги останутся в рублях, пока он не загрузится`);
+  };
 
   const updateRates = async () => {
     setRatesBusy(true);
@@ -104,6 +140,16 @@ export function Settings({
         <h1 class="screen-title">Настройки</h1>
       </header>
 
+      <div class="card partner-entry">
+        <button class="row" onClick={() => setScreen('partner')} data-testid="open-partner">
+          <span class="row-main">
+            <span class="row-title">Партнёр</span>
+            <span class="row-sub">{partner ? `Подключён: ${partner.name || 'партнёр'}` : 'Видеть траты друг друга'}</span>
+          </span>
+          <IconChevron size={18} />
+        </button>
+      </div>
+
       <div class="card">
         <button class="row" onClick={() => setScreen('categories')}>
           <span class="row-main row-title">Категории</span>
@@ -129,20 +175,39 @@ export function Settings({
 
       <section class="group">
         <h3 class="group-head">
-          <span>Курсы валют</span>
+          <span>Валюта и курсы</span>
         </h3>
         <div class="card">
+          <button class="row" onClick={() => setCurrencyPicker(true)} data-testid="display-currency">
+            <span class="row-main">
+              <span class="row-title">Валюта для итогов</span>
+              <span class="row-sub">
+                {displayCode === RUB
+                  ? 'итоги, отчёты и бюджеты — в рублях'
+                  : rates?.displayRate
+                    ? `пересчёт по курсу ЦБ: ${formatRate(rates.displayRate.rate, displayCode)}`
+                    : 'курса ещё нет — пока показываю в рублях'}
+              </span>
+            </span>
+            <span class="row-value">{displayCode}</span>
+            <IconChevron size={18} />
+          </button>
           <button class="row" onClick={run(updateRates)} disabled={ratesBusy}>
             <span class="row-main">
               <span class="row-title accent">{ratesBusy ? 'Загружаю…' : 'Обновить курсы ЦБ'}</span>
-              <span class="row-sub">{rateDate ? `Сохранены курсы на ${formatShortDate(rateDate)}` : 'Курсы ещё не загружались'}</span>
+              <span class="row-sub">
+                {rates?.date
+                  ? `на ${formatShortDate(rates.date)}${rates.refreshedAt ? ` · обновлены ${refreshedText(rates.refreshedAt)}` : ''}`
+                  : 'курсы ещё не загружались'}
+              </span>
             </span>
           </button>
         </div>
         <p class="footnote">
-          Курс подтягивается сам, когда записываешь трату в валюте. В запросе к cbr-xml-daily.ru только дата — данные о тратах
-          никуда не уходят.
+          Курсы обновляются сами: при запуске и раз в 6 часов, пока приложение открыто. Итоги в другой валюте считаются по
+          последнему курсу ЦБ. В запросе к cbr-xml-daily.ru только дата — данные о тратах никуда не уходят.
         </p>
+        {currencyPicker && <CurrencyPicker value={displayCode} onPick={(code) => void pickDisplay(code)} onClose={() => setCurrencyPicker(false)} />}
       </section>
 
       <section class="group">

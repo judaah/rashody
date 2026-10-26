@@ -1,11 +1,12 @@
 import { useState } from 'preact/hooks';
 import type { Category } from '../db/db';
 import { allBudgets, expensesOfMonth, setBudget } from '../db/repo';
-import { evalAmount, formatMoney, minorToInput } from '../lib/money';
+import { evalAmount, minorToInput } from '../lib/money';
 import { formatMonth, monthOf } from '../lib/dates';
 import { activeBudgets, budgetState, budgetTotal, sumByCategory, type BudgetState } from '../lib/stats';
 import { useLive, useToday } from '../lib/hooks';
 import { CategoryBadge } from './common';
+import { useMoney } from './displayMoney';
 import { IconBack, IconChevron } from './icons';
 
 const LEVEL_TEXT = { ok: 'в пределах', warn: 'почти исчерпан', over: 'перерасход' } as const;
@@ -27,12 +28,13 @@ export function BudgetMeter({ state }: { state: BudgetState }) {
 }
 
 /** «осталось 3 200 ₽» / «перерасход 1 200 ₽» — текст рядом с полоской, чтобы смысл не держался на цвете. */
-export function budgetCaption(state: BudgetState, withLimit = true): string {
-  if (state.left < 0) return `перерасход ${formatMoney(-state.left)}`;
-  return withLimit ? `осталось ${formatMoney(state.left)} из ${formatMoney(state.limit)}` : `осталось ${formatMoney(state.left)}`;
+export function budgetCaption(state: BudgetState, fmt: (rub: number) => string, withLimit = true): string {
+  if (state.left < 0) return `перерасход ${fmt(-state.left)}`;
+  return withLimit ? `осталось ${fmt(state.left)} из ${fmt(state.limit)}` : `осталось ${fmt(state.left)}`;
 }
 
 export function Budgets({ categoryList, categories, onBack }: { categoryList: Category[]; categories: Map<string, Category>; onBack: () => void }) {
+  const money = useMoney();
   const today = useToday();
   const ym = monthOf(today);
   const [editing, setEditing] = useState<Category | null>(null);
@@ -58,10 +60,10 @@ export function Budgets({ categoryList, categories, onBack }: { categoryList: Ca
         <div class="card budget-card">
           <div class="budget-line">
             <span>Все лимиты на {formatMonth(ym, ym).toLowerCase()}</span>
-            <b>{formatMoney(total.limit)}</b>
+            <b>{money.fmt(total.limit)}</b>
           </div>
           <BudgetMeter state={total} />
-          <div class="row-sub">Потрачено {formatMoney(total.spent)} · {budgetCaption(total)}</div>
+          <div class="row-sub">Потрачено {money.fmt(total.spent)} · {budgetCaption(total, money.fmt)}</div>
         </div>
       )}
 
@@ -78,13 +80,13 @@ export function Budgets({ categoryList, categories, onBack }: { categoryList: Ca
                 {state ? (
                   <>
                     <BudgetMeter state={state} />
-                    <span class="row-sub">{budgetCaption(state, false)}</span>
+                    <span class="row-sub">{budgetCaption(state, money.fmt, false)}</span>
                   </>
                 ) : (
-                  <span class="row-sub">в этом месяце {formatMoney(spent)}</span>
+                  <span class="row-sub">в этом месяце {money.fmt(spent)}</span>
                 )}
               </span>
-              <span class="row-value">{limit ? formatMoney(limit) : 'без лимита'}</span>
+              <span class="row-value">{limit ? money.fmt(limit) : 'без лимита'}</span>
               <IconChevron size={18} />
             </button>
           );
@@ -104,6 +106,7 @@ export function Budgets({ categoryList, categories, onBack }: { categoryList: Ca
 }
 
 function BudgetForm({ category, current, spent, onClose }: { category: Category; current: number | null; spent: number; onClose: () => void }) {
+  const money = useMoney();
   const [text, setText] = useState(current ? minorToInput(current) : '');
   const [error, setError] = useState<string | null>(null);
 
@@ -134,7 +137,7 @@ function BudgetForm({ category, current, spent, onClose }: { category: Category;
         <div class="form-preview">
           <CategoryBadge category={category} size={64} />
           <div class="form-preview-title">{category.name}</div>
-          <div class="row-sub">в этом месяце потрачено {formatMoney(spent)}</div>
+          <div class="row-sub">в этом месяце потрачено {money.fmt(spent)}</div>
         </div>
         <label class="field">
           <span>Лимит в месяц, ₽</span>

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { RUB_DISPLAY, toDisplay } from '../src/ui/displayMoney';
 import { applyKey, evalAmount, formatMoney, formatMoneyCompact, hasOperator, plural, minorToInput, type KeypadKey } from '../src/lib/money';
 
 const type = (keys: KeypadKey[], start = '') => keys.reduce(applyKey, start);
@@ -110,6 +111,20 @@ describe('formatMoneyCompact', () => {
     expect(plain(formatMoneyCompact(950050))).toBe('9 501 ₽');
     expect(plain(formatMoneyCompact(4530000))).toBe('45,3 тыс. ₽');
     expect(plain(formatMoneyCompact(125000000))).toBe('1,3 млн ₽');
+  });
+
+  it('в другой валюте — её знак', () => {
+    expect(plain(formatMoneyCompact(65000, 'USD'))).toBe('650 $');
+    expect(plain(formatMoneyCompact(4530000, 'USD'))).toBe('45,3 тыс. $');
+  });
+});
+
+describe('валюта просмотра', () => {
+  const usd = { code: 'USD', rate: 80.5381, rateDate: '2026-10-24' };
+  it('рубли пересчитываются по курсу, рубль остаётся как есть', () => {
+    expect(toDisplay(5268541, usd)).toBe(65417); // 52 685,41 ₽ → 654,17 $
+    expect(toDisplay(5268541, RUB_DISPLAY)).toBe(5268541);
+    expect(toDisplay(-29900, usd)).toBe(-371); // возврат остаётся возвратом
   });
 });
 

@@ -1,4 +1,14 @@
-import { db, TABLE_NAMES, type Category, type Expense, type TableName } from '../db/db';
+import {
+  db,
+  DEVICE_ONLY_SETTINGS,
+  SETTING_PAIRING,
+  SETTING_PARTNER,
+  TABLE_NAMES,
+  type Category,
+  type Expense,
+  type Setting,
+  type TableName,
+} from '../db/db';
 import { SETTING_LAST_BACKUP } from '../db/repo';
 
 export const BACKUP_APP = 'rashody';
@@ -18,8 +28,10 @@ export async function exportBackup(now: Date = new Date()): Promise<BackupFile> 
   return db.transaction('r', db.tables, async () => {
     const tables = {} as Record<TableName, unknown[]>;
     for (const name of TABLE_NAMES) tables[name] = await db.table(name).toArray();
-    // Дата бэкапа внутри самого бэкапа бессмысленна — не тащим её туда.
-    tables.settings = (tables.settings as Array<{ key: string }>).filter((s) => s.key !== SETTING_LAST_BACKUP);
+    // Дата бэкапа внутри самого бэкапа бессмысленна, а ключ пары в файле в iCloud — лишний риск.
+    tables.settings = (tables.settings as Array<{ key: string }>).filter(
+      (s) => s.key !== SETTING_LAST_BACKUP && !DEVICE_ONLY_SETTINGS.includes(s.key),
+    );
     return { app: BACKUP_APP, format: BACKUP_FORMAT, exportedAt: now.toISOString(), tables };
   });
 }
@@ -85,14 +97,19 @@ export function parseBackup(text: string): BackupFile {
   return validateBackup(data);
 }
 
-/** Полностью заменяет данные на содержимое бэкапа. */
+/** Полностью заменяет мои данные на содержимое бэкапа. Связь с партнёром остаётся. */
 export async function restoreBackup(backup: BackupFile): Promise<void> {
   await db.transaction('rw', db.tables, async () => {
+    const pairing = await db.settings.get(SETTING_PAIRING);
+    const partner = await db.settings.get(SETTING_PARTNER);
     for (const name of TABLE_NAMES) {
       const table = db.table(name);
       await table.clear();
-      await table.bulkPut(backup.tables[name]);
+      await table.bulkPut(name === 'settings' ? backup.tables.settings.filter((s) => !DEVICE_ONLY_SETTINGS.includes((s as Setting).key)) : backup.tables[name]);
     }
+    if (pairing) await db.settings.put(pairing);
+    if (partner) await db.settings.put(partner);
+    // отпечаток последней отправки не восстанавливаем — данные поменялись, пусть уйдут партнёру
     await db.settings.put({ key: SETTING_LAST_BACKUP, value: Date.parse(backup.exportedAt) });
   });
 }

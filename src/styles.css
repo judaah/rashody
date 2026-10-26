@@ -7,14 +7,17 @@
   --faint: #aeaeb2;
   --sep: rgba(60, 60, 67, 0.16);
   --fill: rgba(118, 118, 128, 0.12);
-  --accent: #14915f;
+  /* тёмная черешня */
+  --accent: #a3123a;
   --on-accent: #ffffff;
-  --danger: #d92d20;
+  /* статусы держим отдельно от черешни: «хорошо» — зелёный, «перерасход» — уходит в оранжевый */
+  --good: #16803f;
+  --danger: #c2410c;
   --warn: #f59e0b;
   --key: #ffffff;
   --key-op: #e2e2e7;
   --toast: #2c2c2e;
-  --toast-action: #4ade80;
+  --toast-action: #ff8fab;
   /* величина без смысла «хорошо/плохо»: столбики месяцев и полоски категорий без лимита */
   --bar: color-mix(in srgb, var(--text) 30%, transparent);
 }
@@ -28,9 +31,10 @@
     --faint: #5a5a5f;
     --sep: rgba(84, 84, 88, 0.55);
     --fill: rgba(118, 118, 128, 0.24);
-    --accent: #30c48d;
-    --on-accent: #04130d;
-    --danger: #ff6961;
+    --accent: #f0567a;
+    --on-accent: #2b0011;
+    --good: #3ccf7a;
+    --danger: #ff7a59;
     --key: #2c2c2e;
     --key-op: #3a3a3c;
     --toast: #3a3a3c;
@@ -90,6 +94,10 @@ h3 {
 
 .danger {
   color: var(--danger);
+}
+
+.good {
+  color: var(--good);
 }
 
 /* ---------- каркас ---------- */
@@ -354,7 +362,7 @@ button.row:active {
 }
 
 .row-amount.is-refund {
-  color: var(--accent);
+  color: var(--good);
 }
 
 .row-value {
@@ -410,7 +418,7 @@ button.row:active {
 }
 
 .level-ok {
-  --m: var(--accent);
+  --m: var(--good);
 }
 
 .level-warn {
@@ -740,7 +748,7 @@ button.row:active {
 }
 
 .amount-value.is-refund {
-  color: var(--accent);
+  color: var(--good);
 }
 
 .link-icon {
@@ -752,6 +760,169 @@ button.row:active {
 .chip-scan {
   color: var(--accent);
   font-weight: 600;
+}
+
+/* ---------- партнёр ---------- */
+
+.scope-switch {
+  max-width: 528px;
+  margin: 10px auto 0;
+  display: flex;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--fill);
+}
+
+/* на узком экране — с отступами экрана */
+@media (max-width: 560px) {
+  .scope-switch {
+    margin: 10px 16px 0;
+  }
+}
+
+.scope-switch button {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scope-switch button.is-on {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.badge-wrap {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+}
+
+/* инициал партнёра на значке его траты; кольцо цвета карточки отделяет его от значка */
+.owner-mark {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--text);
+  color: var(--card);
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px var(--card);
+}
+
+.partner-entry {
+  margin-bottom: 12px;
+}
+
+.partner-card {
+  margin-top: 12px;
+  padding: 14px 16px;
+}
+
+.partner-card-name {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.partner-card .row-sub {
+  white-space: normal;
+  margin-top: 2px;
+}
+
+.warn-text {
+  color: var(--warn) !important;
+  font-weight: 600;
+}
+
+.partner-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.partner-actions .btn {
+  margin: 0;
+}
+
+.invite-card {
+  padding: 16px;
+}
+
+.pair-qr {
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #fff; /* QR всегда на белом — так его читает любая камера, и в тёмной теме тоже */
+}
+
+.pair-qr img {
+  display: block;
+  width: min(100%, 260px);
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.invite-steps {
+  margin: 14px 0 4px;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.invite-steps li + li {
+  margin-top: 6px;
+}
+
+.paste-field {
+  margin-top: 16px;
+}
+
+.paste-field textarea {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  font: 14px ui-monospace, Menlo, monospace;
+  resize: none;
+  outline: none;
+}
+
+.partner-danger {
+  margin-top: 24px;
+}
+
+.partner-view .form-preview {
+  padding-bottom: 16px;
+}
+
+.partner-view-amount {
+  margin-top: 10px;
+  font-size: 34px;
+  font-weight: 700;
+}
+
+.partner-view-amount.is-refund {
+  color: var(--good);
+}
+
+.partner-view-note {
+  max-width: 60%;
+  text-align: right;
+  white-space: normal;
 }
 
 /* ---------- импорт выписки ---------- */

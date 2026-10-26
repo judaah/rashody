@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 8681 --strictPort",
     "test": "vitest run",
-    "icons": "pwa-assets-generator"
+    "icons": "pwa-assets-generator",
+    "build:sync": "esbuild sync-server/yandex.ts --bundle --platform=node --target=node22 --format=cjs --outfile=sync-server/dist/index.js && node -e \"require('fs').writeFileSync('sync-server/dist/package.json', JSON.stringify({type:'commonjs'}))\""
   },
   "dependencies": {
     "dexie": "^4.4.7",

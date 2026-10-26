@@ -169,6 +169,28 @@ describe('бэкап', () => {
     expect(await getSetting(SETTING_LAST_BACKUP, null)).toBe(Date.parse('2026-10-26T10:00:00Z'));
   });
 
+  it('ключ пары не уходит в бэкап, а восстановление из бэкапа не рвёт связь с партнёром', async () => {
+    const pairing = { pairId: 'p'.repeat(22), key: 'k'.repeat(43), deviceId: 'd'.repeat(22), createdAt: 1 };
+    await db.settings.bulkPut([
+      { key: 'pairing', value: pairing },
+      { key: 'partner', value: { name: 'Аня' } },
+      { key: 'syncPushHash', value: 'old' },
+      { key: 'myName', value: 'Дима' },
+    ]);
+    await db.partnerExpenses.put({ id: 'p1', amount: 1, amountRub: 1, currency: 'RUB', rate: 1, categoryId: 'cafe', date: '2026-10-26', note: '', source: 'manual', createdAt: 1, updatedAt: 1 });
+    const backup = await exportBackup();
+    const text = JSON.stringify(backup);
+    expect(text).not.toContain('k'.repeat(43));
+    expect(text).not.toContain('partnerExpenses');
+    expect(backup.tables.settings).toEqual([{ key: 'myName', value: 'Дима' }]);
+
+    await restoreBackup(parseBackup(text));
+    expect(await getSetting('pairing', null)).toEqual(pairing);
+    expect(await getSetting('partner', null)).toEqual({ name: 'Аня' });
+    expect(await getSetting('syncPushHash', null)).toBeNull(); // данные заменились — отправим заново
+    expect(await db.partnerExpenses.count()).toBe(1);
+  });
+
   it('отклоняет чужие и битые файлы понятной ошибкой', async () => {
     expect(() => parseBackup('не json')).toThrow('не JSON');
     expect(() => validateBackup({ foo: 1 })).toThrow('Это не бэкап');

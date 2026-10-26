@@ -5,7 +5,7 @@
 //
 // Первая команда кладёт чистые QR (покупка, возврат, не-чек), вторая делает из QR покупки
 // «фото чека» разной сложности. Папка dist/__test__ отдаётся `npm run preview` по адресу
-// /__test__/…; картинки подаются в <input data-testid="receipt-photo"> через DataTransfer.
+// /__test__/…; картинки подаются в <input data-testid="qr-photo"> через DataTransfer.
 // Следующая сборка папку стирает.
 
 import { mkdirSync } from 'node:fs';

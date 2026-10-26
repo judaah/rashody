@@ -95,7 +95,7 @@ export async function recentExpenses(limit: number): Promise<Expense[]> {
   return sortNewestFirst(items).slice(0, limit);
 }
 
-export function sortNewestFirst(items: Expense[]): Expense[] {
+export function sortNewestFirst<T extends Expense>(items: T[]): T[] {
   return items.sort((a, b) => (a.date === b.date ? b.createdAt - a.createdAt : a.date < b.date ? 1 : -1));
 }
 

@@ -32,6 +32,8 @@ jobs:
         env:
           # приложение живёт по адресу https://<логин>.github.io/<репозиторий>/
           BASE_PATH: /${{ github.event.repository.name }}/
+          # адрес посредника обмена с партнёром (функция в Yandex Cloud); пусто — обмен выключен
+          VITE_SYNC_URL: ${{ vars.SYNC_URL }}
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

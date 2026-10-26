@@ -1,10 +1,10 @@
 import { useState } from 'preact/hooks';
 import type { Category, Expense } from '../db/db';
-import { expensesOfMonth, searchExpenses } from '../db/repo';
-import { formatMoney } from '../lib/money';
+import { scopedMonth, scopedSearch, type OwnedExpense, type Scope } from '../db/scope';
 import { formatMonth, monthOf, shiftMonth } from '../lib/dates';
 import { useLive, useToday } from '../lib/hooks';
 import { DayGroups, EmptyState } from './common';
+import { useMoney } from './displayMoney';
 import { IconBack, IconChevron, IconSearch } from './icons';
 
 export function History({
@@ -13,12 +13,16 @@ export function History({
   initialCategory,
   initialMonth,
   onOpen,
+  scope,
+  partnerMark,
 }: {
   categories: Map<string, Category>;
   categoryList: Category[];
   initialCategory: string | null;
   initialMonth: string | null;
-  onOpen: (e: Expense) => void;
+  onOpen: (e: Expense | OwnedExpense) => void;
+  scope: Scope;
+  partnerMark: string;
 }) {
   const today = useToday();
   const currentYm = monthOf(today);
@@ -26,10 +30,11 @@ export function History({
   const [query, setQuery] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(initialCategory);
 
+  const money = useMoney();
   const searching = query.trim() !== '';
   const items = useLive(
-    () => (searching ? searchExpenses(query, categoryList) : expensesOfMonth(ym)),
-    [searching ? query : '', ym, categoryList],
+    () => (searching ? scopedSearch(query, scope, categories) : scopedMonth(ym, scope)),
+    [searching ? query : '', ym, categories, scope],
   );
   const shown = (items ?? []).filter((e) => !categoryId || e.categoryId === categoryId);
   const total = shown.reduce((s, e) => s + e.amountRub, 0);
@@ -58,7 +63,7 @@ export function History({
           </div>
         )}
         <div class="month-total" data-testid="history-total">
-          {formatMoney(total)}
+          {money.fmt(total)}
         </div>
       </header>
 
@@ -95,7 +100,13 @@ export function History({
           text={searching ? 'Попробуй другое слово.' : 'За этот месяц ничего не записано.'}
         />
       ) : (
-        <DayGroups expenses={shown} categories={categories} today={today} onOpen={onOpen} />
+        <DayGroups
+          expenses={shown}
+          categories={categories}
+          today={today}
+          onOpen={onOpen}
+          partnerMark={scope === 'together' ? partnerMark : undefined}
+        />
       )}
     </div>
   );

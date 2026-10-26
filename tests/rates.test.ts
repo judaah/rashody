@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../src/db/db';
 import { addExpense } from '../src/db/repo';
-import { latestRateDate, localRate, recalcStaleExpenses, recentCurrencies, resolveRate, saveRates } from '../src/db/rates';
+import { autoRefreshRates, latestRate, latestRateDate, localRate, recalcStaleExpenses, recentCurrencies, resolveRate, saveRates } from '../src/db/rates';
 import {
   CBR_LATEST_URL,
   cbrArchiveUrl,
@@ -187,6 +187,27 @@ describe('курс для траты', () => {
 
   it('валютная трата без курса не сохраняется', async () => {
     await expect(addExpense({ amount: 100, currency: 'USD', categoryId: 'cafe', date: '2026-10-26' })).rejects.toThrow('Нет курса');
+  });
+
+  it('курсы обновляются сами не чаще раза в 6 часов, без сети — молча пропускают', async () => {
+    const t0 = Date.parse('2026-10-26T10:00:00');
+    const { impl, calls } = fakeCbr({});
+    expect(await autoRefreshRates({ now: t0, online: false, fetchImpl: impl })).toBe('offline');
+    expect(await autoRefreshRates({ now: t0, online: true, fetchImpl: impl })).toBe('updated');
+    expect(calls).toHaveLength(1);
+    expect(await autoRefreshRates({ now: t0 + 5 * 3600_000, online: true, fetchImpl: impl })).toBe('fresh');
+    expect(calls).toHaveLength(1);
+    expect(await autoRefreshRates({ now: t0 + 7 * 3600_000, online: true, fetchImpl: impl })).toBe('updated');
+    const broken: FetchLike = async () => new Response('', { status: 503 });
+    expect(await autoRefreshRates({ now: t0 + 14 * 3600_000, online: true, fetchImpl: broken })).toBe('failed');
+  });
+
+  it('последний курс для валюты просмотра', async () => {
+    expect(await latestRate('USD')).toBeNull();
+    expect(await latestRate('RUB')).toMatchObject({ rate: 1 });
+    await saveRates(parseCbr(withDate('2026-10-20', 79)));
+    await saveRates(parseCbr(withDate('2026-10-24', 80.5381)));
+    expect(await latestRate('USD')).toEqual({ rate: 80.5381, date: '2026-10-24' });
   });
 
   it('недавние валюты — от свежих к старым, без рубля и повторов', async () => {
