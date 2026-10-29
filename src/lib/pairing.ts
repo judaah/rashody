@@ -11,7 +11,9 @@ export interface PairSecret {
 }
 
 const CODE_PREFIX = 'rsh1';
-const CODE = /^rsh1\.([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{43})$/;
+// Код ищем где угодно в тексте: в ссылке (…#join=rsh1…), в сообщении «Код: rsh1…»,
+// в тексте QR. Длины частей фиксированы, поэтому соседние буквы не мешают.
+const CODE = /rsh1\.([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{43})/;
 
 export function toB64url(bytes: Uint8Array): string {
   let s = '';
@@ -38,10 +40,24 @@ export function pairCode(p: PairSecret): string {
   return `${CODE_PREFIX}.${p.pairId}.${p.key}`;
 }
 
-/** Код из QR или из сообщения: пробелы и переносы, которые добавляют мессенджеры, игнорируем. */
+/** Код из QR, ссылки или сообщения: пробелы и переносы, которые добавляют мессенджеры, игнорируем. */
 export function parsePairCode(text: string): PairSecret | null {
   const m = text.replace(/\s+/g, '').match(CODE);
   return m ? { pairId: m[1], key: m[2] } : null;
+}
+
+/**
+ * Ссылка-приглашение. Код — после «#»: эта часть адреса не уходит на сервер (GitHub Pages
+ * её не видит), её читает только само приложение. Её же кладём в QR — тогда QR открывается
+ * обычной камерой айфона.
+ */
+export function pairLink(p: PairSecret, appUrl: string): string {
+  return `${appUrl}#join=${pairCode(p)}`;
+}
+
+/** Код из адреса, по которому открыли приложение (…#join=rsh1…). */
+export function codeFromHash(hash: string): PairSecret | null {
+  return hash.startsWith('#join=') ? parsePairCode(decodeURIComponent(hash.slice('#join='.length))) : null;
 }
 
 // ---------- ключи ----------

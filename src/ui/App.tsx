@@ -38,7 +38,8 @@ function savedScope(): Scope {
   }
 }
 
-export function App() {
+/** inviteCode — открыли по ссылке-приглашению прямо в приложении: сразу показываем «Партнёр». */
+export function App({ inviteCode = null }: { inviteCode?: string | null }) {
   const categoryList = useLive(() => allCategories(), []);
   const partnerCategories = useLive(() => db.partnerCategories.toArray(), []);
   const pairing = useLive(() => getPairing(), []);
@@ -49,7 +50,7 @@ export function App() {
   const [scopeChoice, setScopeChoice] = useState<Scope>(savedScope);
   const [partnerView, setPartnerView] = useState<OwnedExpense | null>(null);
   useSyncScheduler(!!pairing);
-  const [tab, setTab] = useState<Tab>('home');
+  const [tab, setTab] = useState<Tab>(inviteCode ? 'settings' : 'home');
   const [editor, setEditor] = useState<EditorState | null>(null);
   // key заставляет «Историю» начать заново с нужным фильтром категории и месяцем.
   const [historyView, setHistoryView] = useState<{ category: string | null; month: string | null; key: number }>({
@@ -145,7 +146,9 @@ export function App() {
           />
         )}
         {tab === 'reports' && <Reports categories={categories} onOpenCategory={(id, ym) => showHistory(id, ym)} scope={scope} />}
-        {tab === 'settings' && <Settings categoryList={categoryList} categories={categories} onShowHistory={() => showHistory(null)} />}
+        {tab === 'settings' && (
+          <Settings categoryList={categoryList} categories={categories} onShowHistory={() => showHistory(null)} inviteCode={inviteCode} />
+        )}
       </main>
 
       {tab !== 'settings' && (

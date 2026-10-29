@@ -45,12 +45,14 @@ export function Settings({
   categoryList,
   categories,
   onShowHistory,
+  inviteCode = null,
 }: {
   categoryList: Category[];
   categories: Map<string, Category>;
   onShowHistory: () => void;
+  inviteCode?: string | null;
 }) {
-  const [screen, setScreen] = useState<'main' | 'categories' | 'templates' | 'budgets' | 'import' | 'partner'>('main');
+  const [screen, setScreen] = useState<'main' | 'categories' | 'templates' | 'budgets' | 'import' | 'partner'>(inviteCode ? 'partner' : 'main');
   const partner = useLive(() => getPartner(), []);
   const lastBackup = useLive(() => getSetting<number | null>(SETTING_LAST_BACKUP, null), []);
   const counts = useLive(
@@ -76,7 +78,7 @@ export function Settings({
   if (screen === 'categories') return <Categories categories={categoryList} onBack={back} />;
   if (screen === 'templates') return <Templates categories={categories} categoryList={categoryList} onBack={back} />;
   if (screen === 'budgets') return <Budgets categories={categories} categoryList={categoryList} onBack={back} />;
-  if (screen === 'partner') return <Partner onBack={back} />;
+  if (screen === 'partner') return <Partner onBack={back} inviteCode={inviteCode} />;
   if (screen === 'import') return <Import categoryList={categoryList} onBack={back} onShowHistory={onShowHistory} />;
 
   const run = (fn: () => Promise<void>) => () =>

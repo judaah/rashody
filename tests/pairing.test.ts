@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { authToken, decryptJson, encryptJson, fromB64url, newDeviceId, newPair, pairCode, parsePairCode, toB64url } from '../src/lib/pairing';
+import { authToken, codeFromHash, decryptJson, encryptJson, fromB64url, newDeviceId, newPair, pairCode, pairLink, parsePairCode, toB64url } from '../src/lib/pairing';
 import { buildSnapshot, readSnapshot } from '../src/lib/snapshot';
 import { DEFAULT_CATEGORIES } from '../src/db/seed';
 import type { Expense } from '../src/db/db';
@@ -20,6 +20,19 @@ describe('код пары', () => {
     expect(parsePairCode(`  ${code.slice(0, 30)}\n${code.slice(30)} `)).toEqual(p);
     expect(parsePairCode('rsh1.короткий.код')).toBeNull();
     expect(parsePairCode('t=20261026T1530&s=10&fn=1&i=2&fp=3')).toBeNull(); // QR чека — не код пары
+  });
+
+  it('код находится в ссылке, в QR со ссылкой и в тексте сообщения', () => {
+    const p = newPair();
+    const link = pairLink(p, 'https://judaah.github.io/rashody/');
+    expect(link).toBe(`https://judaah.github.io/rashody/#join=${pairCode(p)}`);
+    expect(parsePairCode(link)).toEqual(p);
+    expect(parsePairCode(`Подключись ко мне в «Расходах»: ${link} — жду!`)).toEqual(p);
+    expect(parsePairCode(`Code:${pairCode(p)}Thanks`)).toEqual(p); // латиница вплотную к коду
+    expect(codeFromHash(`#join=${pairCode(p)}`)).toEqual(p);
+    expect(codeFromHash(`#join=${encodeURIComponent(pairCode(p))}`)).toEqual(p);
+    expect(codeFromHash('#history')).toBeNull();
+    expect(codeFromHash('')).toBeNull();
   });
 
   it('base64url туда-обратно', () => {

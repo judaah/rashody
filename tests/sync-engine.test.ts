@@ -149,6 +149,38 @@ describe('обмен с партнёром', () => {
     expect(requests.map((r) => r.op)).toEqual(['push', 'pull']);
   });
 
+  it('отключение во время обмена: обмен не возвращает партнёра обратно', async () => {
+    await pair();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    // посредник «думает» над pull, а в это время жмут «Отключить»
+    const slow: Transport = async (request) => {
+      if (request.op === 'pull') await gate;
+      return relay(request);
+    };
+    const inFlight = syncOnce(slow, me);
+    const leaving = leavePairing(relay, me);
+    release();
+    await Promise.all([inFlight, leaving]);
+    expect(await getPairing(me)).toBeNull();
+    expect(await getPartner(me)).toBeNull();
+    expect(await me.partnerExpenses.count()).toBe(0);
+  });
+
+  it('оба нажали «Пригласить»: второй подключается по ссылке первого, его приглашение снимается', async () => {
+    await me.expenses.add(expense('m1', 100));
+    await partner.expenses.add(expense('p1', 200));
+    const { code } = await startPairing(relay, me);
+    const own = await startPairing(relay, partner); // своё приглашение у партнёра
+    const link = `https://judaah.github.io/rashody/#join=${code}`;
+    const state = await joinPairing(link, relay, partner);
+    expect(state).toMatchObject({ status: 'ok', partner: { name: 'Дима' } });
+    expect((await getPairing(partner))!.pairId).toBe((await getPairing(me))!.pairId);
+    expect(own.code).not.toBe(code);
+    expect(await syncOnce(relay, me)).toMatchObject({ status: 'ok', partner: { name: 'Аня' } });
+    expect((await me.partnerExpenses.toArray()).map((e) => e.id)).toEqual(['p1']);
+  });
+
   it('повторное подключение тем же кодом сохраняет номер телефона в паре', async () => {
     const code = await pair();
     const before = await getPairing(partner);

@@ -76,6 +76,11 @@ async function clearPartner(d: RashodyDB): Promise<void> {
   });
 }
 
+/** Пока шёл обмен, могли отключиться или подключиться к другой паре — тогда его итог не записываем. */
+async function samePair(d: RashodyDB, pairId: string): Promise<boolean> {
+  return (await getPairing(d))?.pairId === pairId;
+}
+
 // Обмен на одной базе идёт не больше одного за раз: создание пары и фоновый таймер
 // иначе отправили бы один и тот же снимок дважды.
 const running = new WeakMap<RashodyDB, Promise<SyncState>>();
@@ -116,8 +121,12 @@ async function exchange(transport: Transport, d: RashodyDB): Promise<SyncState> 
   const now = Date.now();
   if (latest.unchanged && partner && latest.device === partner.device) {
     const info = { ...partner, syncedAt: now };
-    await d.settings.put({ key: SETTING_PARTNER, value: info });
-    return { status: 'ok', partner: info };
+    const saved = await d.transaction('rw', d.settings, async () => {
+      if (!(await samePair(d, pairing.pairId))) return false;
+      await d.settings.put({ key: SETTING_PARTNER, value: info });
+      return true;
+    });
+    return saved ? { status: 'ok', partner: info } : { status: 'off', partner: null };
   }
   if (!latest.data) throw new SyncError('Посредник не прислал траты партнёра');
 
@@ -129,14 +138,16 @@ async function exchange(transport: Transport, d: RashodyDB): Promise<SyncState> 
     throw new SyncError('Не получилось расшифровать траты партнёра — подключитесь заново');
   }
   const info: PartnerInfo = { device: latest.device, name: snap.name, etag: latest.etag, updatedAt: latest.updatedAt, syncedAt: now };
-  await d.transaction('rw', [d.partnerExpenses, d.partnerCategories, d.settings], async () => {
+  const saved = await d.transaction('rw', [d.partnerExpenses, d.partnerCategories, d.settings], async () => {
+    if (!(await samePair(d, pairing.pairId))) return false;
     await d.partnerExpenses.clear();
     await d.partnerCategories.clear();
     await d.partnerExpenses.bulkPut(snap.expenses);
     await d.partnerCategories.bulkPut(snap.categories);
     await d.settings.put({ key: SETTING_PARTNER, value: info });
+    return true;
   });
-  return { status: 'ok', partner: info };
+  return saved ? { status: 'ok', partner: info } : { status: 'off', partner: null };
 }
 
 /** Создать пару (или вернуть код уже созданной) и сразу выложить свои траты. */
@@ -170,14 +181,17 @@ export async function joinPairing(code: string, transport: Transport, d: Rashody
 
 /** Отключиться: убрать свой снимок у посредника и траты партнёра у себя. */
 export async function leavePairing(transport: Transport, d: RashodyDB = defaultDb): Promise<void> {
+  // Идущий обмен дописал бы траты партнёра уже после отключения — дожидаемся его.
+  await running.get(d)?.catch(() => null);
   const pairing = await getPairing(d);
+  // Пару убираем у себя сразу: новый обмен её уже не увидит.
+  await d.settings.bulkDelete([SETTING_PAIRING, SETTING_PUSH_HASH]);
+  await clearPartner(d);
   if (pairing) {
     try {
       await transport({ op: 'leave', pair: pairing.pairId, device: pairing.deviceId, auth: await authToken(pairing.key) });
     } catch {
-      // нет сети — локально всё равно отключаемся; снимок у посредника перестанет обновляться
+      // нет сети — локально всё равно отключились; снимок у посредника перестанет обновляться
     }
   }
-  await clearPartner(d);
-  await d.settings.bulkDelete([SETTING_PAIRING, SETTING_PUSH_HASH]);
 }

@@ -1617,3 +1617,126 @@ button.row:active {
   font-weight: 600;
   color: var(--toast-action);
 }
+
+/* ---------- подключение партнёра ---------- */
+
+.invite-offer {
+  margin-bottom: 16px;
+  padding: 16px;
+}
+
+.invite-offer-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.invite-offer .row-sub {
+  margin: 4px 0 14px;
+}
+
+.invite-offer .row-sub,
+.join-card .row-sub {
+  white-space: normal;
+}
+
+.invite-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.invite-actions .btn {
+  flex: 1;
+  margin: 0;
+}
+
+.invite-actions .btn-plain {
+  background: var(--fill);
+}
+
+.join-card .row:disabled {
+  opacity: 0.5;
+}
+
+.join-manual-toggle {
+  display: block;
+  margin: 6px 4px 0;
+  font-size: 15px;
+}
+
+.paste-field + .btn {
+  margin-top: -4px;
+}
+
+/* страница, на которую ведёт ссылка-приглашение в Safari */
+
+.join-landing {
+  padding-top: 40px;
+}
+
+.join-logo {
+  display: block;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 16px;
+  border-radius: 16px;
+}
+
+.join-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.join-lead {
+  margin: 8px 8px 24px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.join-steps {
+  margin: 0;
+  padding: 16px 16px 16px 36px;
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.join-steps li + li {
+  margin-top: 14px;
+}
+
+.join-steps .btn {
+  margin-top: 10px;
+}
+
+.btn.btn-done {
+  background: var(--good);
+  color: #fff;
+}
+
+.join-manual {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.join-code {
+  display: block;
+  margin-top: 6px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--fill);
+  color: var(--text);
+  font: 13px ui-monospace, Menlo, monospace;
+  word-break: break-all;
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+.join-continue {
+  display: block;
+  margin: 16px auto 0;
+}
